@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ── 1. Generate metadata ──────────────────────────────────────────────────────
 python3 build_dates.py
-python3 build_index.py
+uv run build_index.py
 
 # ── 2. Inject shared footer into every HTML tool ─────────────────────────────
 #

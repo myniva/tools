@@ -1,3 +1,7 @@
+# /// script
+# requires-python = ">=3.9"
+# dependencies = ["markdown"]
+# ///
 """
 Generate index.html from README.md.
 
