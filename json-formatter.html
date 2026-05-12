@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JSON Formatter</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      color: #24292e;
+    }
+    h1 { margin-bottom: 4px; }
+    .subtitle { color: #586069; margin: 0 0 20px; font-size: 0.95rem; }
+
+    .columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 640px) {
+      .columns { grid-template-columns: 1fr; }
+    }
+
+    label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; }
+    textarea {
+      width: 100%;
+      height: 320px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.82rem;
+      border: 1px solid #d1d5da;
+      border-radius: 6px;
+      padding: 10px 12px;
+      resize: vertical;
+      background: #f6f8fa;
+      color: #24292e;
+    }
+    textarea:focus { outline: none; border-color: #5b4fcf; box-shadow: 0 0 0 3px rgba(91,79,207,.15); }
+    textarea.error { border-color: #cb2431; background: #fff5f5; }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 7px 16px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 500;
+    }
+    .btn-primary {
+      background: #5b4fcf;
+      color: white;
+      border-color: #5b4fcf;
+    }
+    .btn-primary:hover { background: #3d35a0; }
+    .btn-secondary {
+      background: white;
+      color: #24292e;
+      border-color: #d1d5da;
+    }
+    .btn-secondary:hover { background: #f3f4f6; }
+
+    .indent-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      color: #586069;
+    }
+    .indent-toggle select {
+      padding: 5px 8px;
+      border: 1px solid #d1d5da;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      background: white;
+    }
+
+    .error-msg {
+      color: #cb2431;
+      font-size: 0.85rem;
+      margin-top: 6px;
+      min-height: 1.2em;
+    }
+    .copy-status {
+      font-size: 0.82rem;
+      color: #28a745;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <h1>JSON Formatter</h1>
+  <p class="subtitle">Prettify and validate JSON — paste on the left, get formatted output on the right.</p>
+
+  <div class="controls">
+    <div class="indent-toggle">
+      <label for="indent-select" style="margin:0;font-weight:normal">Indent:</label>
+      <select id="indent-select">
+        <option value="2" selected>2 spaces</option>
+        <option value="4">4 spaces</option>
+        <option value="tab">tab</option>
+      </select>
+    </div>
+    <button class="btn-secondary" id="minify-btn">Minify</button>
+    <button class="btn-secondary" id="clear-btn">Clear</button>
+    <button class="btn-primary" id="copy-btn">Copy output</button>
+    <span class="copy-status" id="copy-status"></span>
+  </div>
+
+  <div class="columns">
+    <div>
+      <label for="input">Input</label>
+      <textarea id="input" placeholder='Paste JSON here…\n{\n  "hello": "world"\n}'></textarea>
+      <div class="error-msg" id="error-msg"></div>
+    </div>
+    <div>
+      <label for="output">Formatted output</label>
+      <textarea id="output" readonly></textarea>
+    </div>
+  </div>
+
+  <script>
+    const inputEl   = document.getElementById('input');
+    const outputEl  = document.getElementById('output');
+    const errorEl   = document.getElementById('error-msg');
+    const indentSel = document.getElementById('indent-select');
+    const copyBtn   = document.getElementById('copy-btn');
+    const copyStatus= document.getElementById('copy-status');
+    const minifyBtn = document.getElementById('minify-btn');
+    const clearBtn  = document.getElementById('clear-btn');
+
+    function getIndent() {
+      const v = indentSel.value;
+      return v === 'tab' ? '\t' : parseInt(v, 10);
+    }
+
+    function format(raw, minify = false) {
+      errorEl.textContent = '';
+      inputEl.classList.remove('error');
+      if (!raw.trim()) { outputEl.value = ''; return; }
+      try {
+        const parsed = JSON.parse(raw);
+        outputEl.value = minify
+          ? JSON.stringify(parsed)
+          : JSON.stringify(parsed, null, getIndent());
+      } catch (e) {
+        inputEl.classList.add('error');
+        errorEl.textContent = e.message;
+        outputEl.value = '';
+      }
+    }
+
+    inputEl.addEventListener('input', () => format(inputEl.value));
+    indentSel.addEventListener('change', () => format(inputEl.value));
+
+    minifyBtn.addEventListener('click', () => format(inputEl.value, true));
+
+    clearBtn.addEventListener('click', () => {
+      inputEl.value = '';
+      outputEl.value = '';
+      errorEl.textContent = '';
+      inputEl.classList.remove('error');
+    });
+
+    copyBtn.addEventListener('click', () => {
+      if (!outputEl.value) return;
+      navigator.clipboard.writeText(outputEl.value).then(() => {
+        copyStatus.textContent = 'Copied!';
+        setTimeout(() => { copyStatus.textContent = ''; }, 1500);
+      });
+    });
+
+    // Support pasting via Ctrl+V anywhere on the page when input is empty
+    document.addEventListener('paste', (e) => {
+      if (document.activeElement === inputEl || document.activeElement === outputEl) return;
+      const text = e.clipboardData.getData('text/plain');
+      if (text) { inputEl.value = text; format(text); }
+    });
+  </script>
+</body>
+</html>

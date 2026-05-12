@@ -1,0 +1,1 @@
+Paste any JSON text on the left to instantly format and validate it on the right. Choose between 2-space, 4-space, or tab indentation, or minify the output to a single line. Invalid JSON is flagged with a descriptive error message highlighted in the input area.

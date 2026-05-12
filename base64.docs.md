@@ -1,0 +1,1 @@
+Encode plain text to Base64 or decode Base64 strings back to text, with real-time output as you type. Toggle URL-safe mode to replace the standard `+` and `/` characters with `-` and `_` (and strip padding) for use in URLs and filenames. Decoding invalid Base64 input is flagged with an error message.
