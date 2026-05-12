@@ -1,0 +1,1 @@
+Paste a Microsoft Teams WebVTT transcript and get clean, LLM-ready output with one speaker block per paragraph. Timestamps are optional and can be toggled on or off. Output is copyable with one click.

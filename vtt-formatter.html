@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VTT Formatter</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #1a1a1a;
+        }
+        h1 { margin-bottom: 4px; }
+        p.desc { color: #555; margin-top: 4px; margin-bottom: 20px; }
+        textarea {
+            width: 100%;
+            height: 220px;
+            font-family: "SFMono-Regular", Consolas, monospace;
+            font-size: 13px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            resize: vertical;
+        }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 12px 0;
+            flex-wrap: wrap;
+        }
+        label.toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .output-wrapper {
+            position: relative;
+            display: none;
+        }
+        .output-wrapper.visible { display: block; }
+        #output {
+            width: 100%;
+            height: 300px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: #f9f9f9;
+            resize: vertical;
+            white-space: pre-wrap;
+        }
+        button.copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 12px;
+            font-size: 13px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+        }
+        button.copy-btn:hover { background: #f0f0f0; }
+        .error {
+            color: #c00;
+            font-size: 13px;
+            margin-top: 6px;
+            display: none;
+        }
+        .error.visible { display: block; }
+        .stats {
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 8px;
+            display: none;
+        }
+        .stats.visible { display: block; }
+        .stats strong { color: #1a1a1a; }
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>VTT Formatter</h1>
+    <p class="desc">Paste a Teams WebVTT transcript — get clean speaker/text blocks ready for an LLM.</p>
+
+    <textarea id="input" placeholder="Paste WEBVTT content here..." spellcheck="false"></textarea>
+
+    <div class="controls">
+        <label class="toggle">
+            <input type="checkbox" id="showTimestamps">
+            Show timestamps
+        </label>
+    </div>
+
+    <p class="error" id="error"></p>
+
+    <p class="stats" id="stats"></p>
+
+    <div class="output-wrapper" id="outputWrapper">
+        <textarea id="output" readonly></textarea>
+        <button class="copy-btn" id="copyBtn">Copy</button>
+    </div>
+
+    <script>
+        const inputEl = document.getElementById('input');
+        const outputEl = document.getElementById('output');
+        const outputWrapper = document.getElementById('outputWrapper');
+        const errorEl = document.getElementById('error');
+        const copyBtn = document.getElementById('copyBtn');
+        const showTimestamps = document.getElementById('showTimestamps');
+        const statsEl = document.getElementById('stats');
+
+        function estimateTokens(str) {
+            return Math.round(str.length / 4);
+        }
+
+        function fmtKB(bytes) {
+            return (bytes / 1024).toFixed(1) + ' KB';
+        }
+
+        function stripMs(ts) {
+            const t = ts.replace(',', '.');
+            return t.substring(0, t.lastIndexOf('.'));
+        }
+
+        function parseVTT(raw) {
+            const blocks = raw.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+            const cues = [];
+
+            for (const block of blocks) {
+                const lines = block.split('\n').map(l => l.trim());
+                if (lines[0] === 'WEBVTT') continue;
+
+                const tsIndex = lines.findIndex(l => l.includes('-->'));
+                if (tsIndex === -1) continue;
+
+                const tsLine = lines[tsIndex];
+                const tsMatch = tsLine.match(
+                    /^(\d{2}:\d{2}:\d{2}[.,]\d{3}|\d{2}:\d{2}[.,]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[.,]\d{3}|\d{2}:\d{2}[.,]\d{3})/
+                );
+                if (!tsMatch) continue;
+
+                const startTime = stripMs(tsMatch[1]);
+                const endTime   = stripMs(tsMatch[2]);
+
+                const textLines = lines.slice(tsIndex + 1);
+                if (!textLines.length) continue;
+
+                const fullText = textLines.join(' ');
+                const speakerMatch = fullText.match(/^<v ([^>]+)>(.*?)<\/v>\s*$/s);
+
+                let speaker = null;
+                let text = '';
+                if (speakerMatch) {
+                    speaker = speakerMatch[1].trim();
+                    text = speakerMatch[2].trim();
+                } else {
+                    text = fullText.replace(/<[^>]+>/g, '').trim();
+                }
+
+                if (!text) continue;
+                cues.push({ speaker, startTime, endTime, text });
+            }
+
+            // Merge consecutive cues from the same speaker
+            const entries = [];
+            for (const cue of cues) {
+                const prev = entries[entries.length - 1];
+                if (prev && prev.speaker === cue.speaker) {
+                    prev.endTime = cue.endTime;
+                    prev.text += ' ' + cue.text;
+                } else {
+                    entries.push({ ...cue });
+                }
+            }
+            return entries;
+        }
+
+        function format(entries, withTimestamps) {
+            return entries.map(({ speaker, startTime, endTime, text }) => {
+                let timeStr = '';
+                if (withTimestamps) {
+                    timeStr = startTime === endTime ? startTime : `${startTime} – ${endTime}`;
+                }
+                const header = [speaker, timeStr].filter(Boolean).join('   ');
+                return header ? `${header}\n${text}` : text;
+            }).join('\n\n');
+        }
+
+        function process() {
+            const raw = inputEl.value;
+            errorEl.classList.remove('visible');
+
+            if (!raw.trim()) {
+                outputWrapper.classList.remove('visible');
+                statsEl.classList.remove('visible');
+                return;
+            }
+
+            const entries = parseVTT(raw);
+
+            if (!entries.length) {
+                errorEl.textContent = 'No valid VTT cues found. Make sure you pasted a WebVTT file.';
+                errorEl.classList.add('visible');
+                outputWrapper.classList.remove('visible');
+                statsEl.classList.remove('visible');
+                return;
+            }
+
+            const formatted = format(entries, showTimestamps.checked);
+            outputEl.value = formatted;
+            outputWrapper.classList.add('visible');
+
+            const inBytes = new TextEncoder().encode(raw).length;
+            const outBytes = new TextEncoder().encode(formatted).length;
+            const savedBytes = inBytes - outBytes;
+            const savedTokens = estimateTokens(raw) - estimateTokens(formatted);
+            const pct = Math.round((savedBytes / inBytes) * 100);
+            statsEl.innerHTML =
+                `Input: <strong>${fmtKB(inBytes)}</strong> (~<strong>${estimateTokens(raw).toLocaleString()}</strong> tokens) → ` +
+                `Output: <strong>${fmtKB(outBytes)}</strong> (~<strong>${estimateTokens(formatted).toLocaleString()}</strong> tokens) — ` +
+                `saved <strong>${fmtKB(savedBytes)}</strong> / <strong>${savedTokens.toLocaleString()}</strong> tokens (<strong>${pct}%</strong>)`;
+            statsEl.classList.add('visible');
+        }
+
+        inputEl.addEventListener('input', process);
+        showTimestamps.addEventListener('change', process);
+
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(outputEl.value).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+            });
+        });
+    </script>
+<script src="footer.js?ae9ea2e1"></script>
+</body>
+</html>
