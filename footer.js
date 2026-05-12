@@ -8,7 +8,7 @@
  *  - Auto-detects page background to pick contrasting footer text colour
  */
 (async function () {
-  const GITHUB_REPO = "ch01bnb/tools";
+  const GITHUB_REPO = "myniva/tools";
   const slug = location.pathname.replace(/^\/|\.html$/g, "").split("/").pop();
 
   // ── helpers ──────────────────────────────────────────────────────────────
