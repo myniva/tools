@@ -29,8 +29,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Python dependencies
-        run: pip install markdown
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1
 
       - name: Build site
         run: bash build.sh
