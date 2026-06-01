@@ -1,1 +1,0 @@
-Generate SHA-256 and SHA-512 cryptographic hashes of any text directly in your browser using the Web Crypto API — no data is sent to a server. Output can be displayed in hexadecimal or Base64 encoding. Hashes update in real time as you type.
