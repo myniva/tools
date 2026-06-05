@@ -141,6 +141,12 @@
             return t.substring(0, t.lastIndexOf('.'));
         }
 
+        function decodeHTMLEntities(str) {
+            const el = document.createElement('textarea');
+            el.innerHTML = str;
+            return el.value;
+        }
+
         function parseVTT(raw) {
             const blocks = raw.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
             const cues = [];
@@ -170,10 +176,10 @@
                 let speaker = null;
                 let text = '';
                 if (speakerMatch) {
-                    speaker = speakerMatch[1].trim();
-                    text = speakerMatch[2].trim();
+                    speaker = decodeHTMLEntities(speakerMatch[1].trim());
+                    text = decodeHTMLEntities(speakerMatch[2].trim());
                 } else {
-                    text = fullText.replace(/<[^>]+>/g, '').trim();
+                    text = decodeHTMLEntities(fullText.replace(/<[^>]+>/g, '').trim());
                 }
 
                 if (!text) continue;
