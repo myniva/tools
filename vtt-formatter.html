@@ -24,6 +24,13 @@
             border: 1px solid #ccc;
             border-radius: 6px;
             resize: vertical;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        textarea.drag-over {
+            border-color: #0078d4;
+            background: #e8f4ff;
+            outline: 2px dashed #0078d4;
+            outline-offset: -2px;
         }
         .controls {
             display: flex;
@@ -94,7 +101,7 @@
     <h1>VTT Formatter</h1>
     <p class="desc">Paste a Teams WebVTT transcript — get clean speaker/text blocks ready for an LLM.</p>
 
-    <textarea id="input" placeholder="Paste WEBVTT content here..." spellcheck="false"></textarea>
+    <textarea id="input" placeholder="Paste WEBVTT content here, or drag &amp; drop a .vtt file..." spellcheck="false"></textarea>
 
     <div class="controls">
         <label class="toggle">
@@ -236,6 +243,26 @@
 
         inputEl.addEventListener('input', process);
         showTimestamps.addEventListener('change', process);
+
+        inputEl.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            inputEl.classList.add('drag-over');
+        });
+        inputEl.addEventListener('dragleave', () => {
+            inputEl.classList.remove('drag-over');
+        });
+        inputEl.addEventListener('drop', (e) => {
+            e.preventDefault();
+            inputEl.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                inputEl.value = ev.target.result;
+                process();
+            };
+            reader.readAsText(file);
+        });
 
         copyBtn.addEventListener('click', () => {
             navigator.clipboard.writeText(outputEl.value).then(() => {
