@@ -144,6 +144,8 @@
         function decodeHTMLEntities(str) {
             const el = document.createElement('textarea');
             el.innerHTML = str;
+            // Decode twice: handles double-encoded entities (e.g. &amp;#252; → &#252; → ü)
+            el.innerHTML = el.value;
             return el.value;
         }
 
